@@ -1,13 +1,13 @@
 {
     "version": "4.1.2",
-    "name": "cordova-launch-review",
+    "name": "@globules-io/cordova-launch-review",
     "cordova_name": "Launch Review",
     "description": "Cordova/Phonegap plugin for iOS and Android to assist in leaving user reviews/ratings in the App Stores.",
     "author": "Dave Alden",
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/dpa99c/cordova-launch-review.git"
+        "url": "https://github.com/globules-io/cordova-launch-review.git"
     },
     "cordova": {
         "id": "cordova-launch-review",
@@ -16,7 +16,7 @@
             "ios"
         ]
     },
-    "issue": "https://github.com/dpa99c/cordova-launch-review/issues",
+    "issue": "https://github.com/globules-io/cordova-launch-review/issues",
     "keywords": [
         "ecosystem:cordova",
         "cordova",
