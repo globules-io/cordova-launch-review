@@ -41,7 +41,7 @@ To help ensure this plugin is kept updated, new features are added and bugfixes 
 
 ## Using the Cordova/Phonegap [CLI](http://docs.phonegap.com/en/edge/guide_cli_index.md.html)
 
-    $ cordova plugin add cordova-launch-review
+    $ cordova plugin add @globules-io/cordova-launch-review
 
 # Usage
 
