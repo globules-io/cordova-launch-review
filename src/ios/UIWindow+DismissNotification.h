@@ -1,15 +1,17 @@
 @import UIKit;
-@interface MonitorObject:NSObject
 
-@property (nonatomic, weak) UIWindow* owner;
+#pragma mark - MonitorObject
 
--(id)init:(UIWindow*)owner;
--(void)dealloc;
+@interface MonitorObject : NSObject
+
+@property (nonatomic, weak) UIWindow *owner;
+
+- (instancetype)initWithOwner:(UIWindow *)owner;
 
 @end
 
-@interface UIWindow (DismissNotification)
+#pragma mark - UIWindow (DismissNotification)
 
-+ (void)load;
+@interface UIWindow (DismissNotification)
 
 @end

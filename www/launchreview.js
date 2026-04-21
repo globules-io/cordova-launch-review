@@ -22,41 +22,51 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-var LaunchReview = {};
+var exec = require('cordova/exec');
 
-/**
- * Launches App Store on current platform in order to leave a review for given app
- * @param {function} success (optional) -  function to be called when plugin call was successful.
- * @param {function} error (optional) - function to be called on error during plugin call.
- * Will be passed a single argument which is the error message string.
- * @param {string} appId (optional) - ID of app to open in App Store.
- * If not specified, the ID for the current app will be used.
- */
-LaunchReview.launch = function(success, error, appId) {
-    cordova.exec(success, error, 'LaunchReview', 'launch', [appId]);
-};
+var LaunchReview = {
+     /**
+      * Check if the current platform and OS version supports in-app rating prompts.
+      * @returns {boolean}
+      */
+     isRatingSupported: function () {
+          var deviceVersion = window.device && window.device.version ? parseFloat(window.device.version) : 0;
+          return deviceVersion >= 10.3 || (cordova.platformId === 'ios' && deviceVersion === 0); // fallback if device plugin not present
+     },
 
-/**
- * Opens the in-app ratings dialog on iOS 10.3+ or the in-app review dialog on Android.
- * @param {function} success (optional) -  function to be called when plugin call was successful.
- * @param {function} error (optional) - function to be called on error during plugin call.
- * Will be passed a single argument which is the error message string.
- */
-LaunchReview.rating = function(success, error) {
-    if(LaunchReview.isRatingSupported()){
-        cordova.exec(success, error, 'LaunchReview', 'rating', []);
-    }else{
-        error("Rating dialog requires iOS 10.3+");
-    }
-};
+     /**
+      * Request the in-app rating dialog (iOS) or Play Store review flow (Android).
+      * On success, returns "requested". The "shown" / "dismissed" events are unreliable.
+      *
+      * @param {function} successCallback - called with status string ("requested", "shown", "dismissed")
+      * @param {function} errorCallback   - called on error
+      */
+     rating: function (successCallback, errorCallback) {
+          if (!this.isRatingSupported()) {
+               if (errorCallback) errorCallback('Rating dialog requires iOS 10.3+ or equivalent Android support');
+               return;
+          }
 
-/**
- * Indicates if the current platform supports in-app ratings dialog, i.e. calling LaunchReview.rating().
- * Will return true if current platform is Android or iOS 10.3 or above.
- * @returns {boolean} true if the current platform supports in-app ratings dialog
- */
-LaunchReview.isRatingSupported = function(){
-    return cordova.platformId === 'android' || (cordova.platformId === 'ios' && parseFloat(device.version) >= 10.3)
+          exec(successCallback, errorCallback, 'LaunchReview', 'rating', []);
+     },
+
+     /**
+      * Launch the App Store write-review page for the current app (or specified appId).
+      *
+      * @param {string} [appId]          - optional App Store ID. If omitted, plugin attempts to detect it.
+      * @param {function} successCallback
+      * @param {function} errorCallback
+      */
+     launch: function (appId, successCallback, errorCallback) {
+          // Support both old signature (no appId) and new (with appId)
+          if (typeof appId === 'function') {
+               errorCallback = successCallback;
+               successCallback = appId;
+               appId = null;
+          }
+
+          exec(successCallback, errorCallback, 'LaunchReview', 'launch', [appId || null]);
+     },
 };
 
 module.exports = LaunchReview;
