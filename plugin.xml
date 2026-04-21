@@ -31,11 +31,7 @@
     <dependency id="cordova-plugin-device" version="*" />
 
     <!-- iOS Platform -->
-    <platform name="ios">
-        <!-- Set a modern minimum deployment target suitable for iOS 26 era -->
-        <!-- Developers can override this in their config.xml if they need to support older iOS versions -->
-        <preference name="deployment-target" value="15.0" />
-
+    <platform name="ios">        
         <config-file target="config.xml" parent="/*">
             <feature name="LaunchReview">
                 <param name="ios-package" value="LaunchReview"/>
