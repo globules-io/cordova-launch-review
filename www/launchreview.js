@@ -30,8 +30,20 @@ var LaunchReview = {
       * @returns {boolean}
       */
      isRatingSupported: function () {
-          var deviceVersion = window.device && window.device.version ? parseFloat(window.device.version) : 0;
-          return deviceVersion >= 10.3 || (cordova.platformId === 'ios' && deviceVersion === 0); // fallback if device plugin not present
+          var platformId = typeof cordova !== 'undefined' ? cordova.platformId : null;
+
+          if (platformId === 'ios') {
+               if (!(window.device && window.device.version)) {
+                    return true; // fallback if device plugin is not present
+               }
+               return parseFloat(window.device.version) >= 10.3;
+          }
+
+          if (platformId === 'android') {
+               return true;
+          }
+
+          return false;
      },
 
      /**
