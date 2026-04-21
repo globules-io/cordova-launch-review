@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2015 Dave Alden  (http://github.com/dpa99c)
+ * Copyright (c) 2015 Dave Alden (http://github.com/dpa99c)
+ * Updated 2026 for iOS 26 compatibility by Grok
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -21,13 +22,11 @@
  * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
  */
-#import "LaunchReview.h"
-#import "StoreKit/StoreKit.h"
-#import "UIWindow+DismissNotification.h"
 
-#define REQUEST_TIMEOUT 60.0
+#import "LaunchReview.h"
+#import <StoreKit/StoreKit.h>
+#import "UIWindow+DismissNotification.h"
 
 @implementation LaunchReview
 
@@ -38,29 +37,30 @@
                                              selector:@selector(windowDidBecomeVisibleNotification:)
                                                  name:UIWindowDidBecomeVisibleNotification
                                                object:nil];
+    
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(windowDidBecomeHiddenNotification:)
                                                  name:UIWindowDidBecomeHiddenNotification
-                                            object:nil];
+                                               object:nil];
+    
     self.appStoreId = nil;
     self.launchRequestCallbackId = nil;
     self.ratingRequestCallbackId = nil;
     
-    // Try to pre-fetch the App ID at app startup
+    // Pre-fetch App ID in background
     [self.commandDelegate runInBackground:^{
         [self fetchAppIdFromBundleId];
     }];
 }
 
-- (void) launch:(CDVInvokedUrlCommand*)command;
-{
+- (void)launch:(CDVInvokedUrlCommand*)command {
     @try {
         self.launchRequestCallbackId = command.callbackId;
         
         NSString* appId = [command.arguments objectAtIndex:0];
-        if([self isNull:appId]){
+        if ([self isNull:appId]) {
             [self retrieveAppIdAndLaunch];
-        }else{
+        } else {
             [self launchAppStore:appId];
         }
     }
@@ -69,45 +69,62 @@
     }
 }
 
-- (void) rating:(CDVInvokedUrlCommand*)command;
-{
+- (void)rating:(CDVInvokedUrlCommand*)command {
     @try {
-        if ([SKStoreReviewController class]) {
-            self.ratingRequestCallbackId = command.callbackId;
-            [SKStoreReviewController requestReview];
-            CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"requested"];
-            [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-        }else{
-            [self handlePluginError:@"Rating dialog requires iOS 10.3+" :command.callbackId];
+        self.ratingRequestCallbackId = command.callbackId;
+        
+        UIWindowScene *activeScene = nil;
+        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if (scene.activationState == UISceneActivationStateForegroundActive &&
+                [scene isKindOfClass:[UIWindowScene class]]) {
+                activeScene = (UIWindowScene *)scene;
+                break;
+            }
         }
+        
+        if (@available(iOS 18.0, *)) {
+            if (activeScene) {
+                [AppStore requestReviewInScene:activeScene];
+            } else {
+                [self handlePluginError:@"No active UIWindowScene found for review request" :command.callbackId];
+                return;
+            }
+        } else if (@available(iOS 14.0, *)) {
+            if (activeScene && [SKStoreReviewController class]) {
+                [SKStoreReviewController requestReviewInScene:activeScene];
+            } else if ([SKStoreReviewController class]) {
+                [SKStoreReviewController requestReview];
+            } else {
+                [self handlePluginError:@"Rating dialog requires iOS 10.3+" :command.callbackId];
+                return;
+            }
+        } else if ([SKStoreReviewController class]) {
+            [SKStoreReviewController requestReview];
+        } else {
+            [self handlePluginError:@"Rating dialog requires iOS 10.3+" :command.callbackId];
+            return;
+        }
+        
+        // Always send "requested" immediately (Apple does not guarantee the prompt will appear)
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                          messageAsString:@"requested"];
+        [pluginResult setKeepCallback:@YES];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }
     @catch (NSException *exception) {
         [self handlePluginException:exception :command.callbackId];
     }
 }
 
-- (void) handlePluginException: (NSException*) exception :(NSString*)callbackId
-{
-    [self handlePluginError:exception.reason :callbackId];
-}
-
-- (void) handlePluginError: (NSString*) errorMsg :(NSString*)callbackId
-{
-    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:errorMsg];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
-}
-
-
-- (void)windowDidBecomeVisibleNotification:(NSNotification *)notification
-{
+- (void)windowDidBecomeVisibleNotification:(NSNotification *)notification {
     @try {
-        NSString* notificationClassName = NSStringFromClass([notification.object class]);
-        if([notification.object class] == [MonitorObject class]
-           || [notificationClassName isEqualToString:@"SKStoreReviewPresentationWindow"]
-        ){
-            CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"shown"];
-            [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+        NSString* className = NSStringFromClass([notification.object class]);
+        if ([notification.object class] == [MonitorObject class] ||
+            [className isEqualToString:@"SKStoreReviewPresentationWindow"]) {
+            
+            CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                              messageAsString:@"shown"];
+            [pluginResult setKeepCallback:@YES];
             [self.commandDelegate sendPluginResult:pluginResult callbackId:self.ratingRequestCallbackId];
         }
     }
@@ -116,15 +133,15 @@
     }
 }
 
-- (void)windowDidBecomeHiddenNotification:(NSNotification *)notification
-{
+- (void)windowDidBecomeHiddenNotification:(NSNotification *)notification {
     @try {
-        NSString* notificationClassName = NSStringFromClass([notification.object class]);
-        if([notification.object class] == [MonitorObject class]
-           || [notificationClassName isEqualToString:@"SKStoreReviewPresentationWindow"]
-        ){
-            CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:@"dismissed"];
-            [pluginResult setKeepCallback:[NSNumber numberWithBool:NO]];
+        NSString* className = NSStringFromClass([notification.object class]);
+        if ([notification.object class] == [MonitorObject class] ||
+            [className isEqualToString:@"SKStoreReviewPresentationWindow"]) {
+            
+            CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                              messageAsString:@"dismissed"];
+            [pluginResult setKeepCallback:@NO];
             [self.commandDelegate sendPluginResult:pluginResult callbackId:self.ratingRequestCallbackId];
         }
     }
@@ -133,171 +150,78 @@
     }
 }
 
-- (BOOL) isNull:(NSString*) string
-{
-    return string == nil || string == (NSString*)[NSNull null];
+- (BOOL)isNull:(NSString*)string {
+    return string == nil || string == (id)[NSNull null];
 }
 
-- (void) launchAppStore:(NSString*) appId
-{
-    NSString* iTunesLink;
-    if([[[UIDevice currentDevice] systemVersion] floatValue] >= 11){
-        iTunesLink = [NSString stringWithFormat:@"itms-apps://itunes.apple.com/xy/app/foo/id%@?action=write-review", appId];
-    }else{
-        iTunesLink = [NSString stringWithFormat:@"itms-apps://itunes.apple.com/WebObjects/MZStore.woa/wa/viewContentsUserReviews?type=Purple+Software&id=%@&action=write-review", appId];
-    }
+- (void)launchAppStore:(NSString*)appId {
+    NSString* iTunesLink = [NSString stringWithFormat:@"https://apps.apple.com/app/id%@?action=write-review", appId];
     
     NSURL *url = [NSURL URLWithString:iTunesLink];
     if ([[UIApplication sharedApplication] canOpenURL:url]) {
         [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
     } else {
-        NSLog(@"Cannot open URL: %@", url);
+        NSLog(@"LaunchReview: Cannot open URL: %@", url);
     }
     
-    [self.commandDelegate sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_OK] callbackId:self.launchRequestCallbackId];
+    [self.commandDelegate sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_OK]
+                                callbackId:self.launchRequestCallbackId];
 }
 
-- (void) retrieveAppIdAndLaunch
-{
+- (void)retrieveAppIdAndLaunch {
     [self fetchAppIdFromBundleId];
-    if(self.appStoreId != nil){
+    if (self.appStoreId != nil) {
         [self launchAppStore:self.appStoreId];
     }
 }
 
-- (void) fetchAppIdFromBundleId
-{
-    if(self.appStoreId != nil) return;
+- (void)fetchAppIdFromBundleId {
+    if (self.appStoreId != nil) return;
     
-    NSString* bundleId = [NSBundle mainBundle].bundleIdentifier;
-    NSString* iTunesServiceURL = [NSString stringWithFormat:@"http://itunes.apple.com/lookup?bundleId=%@", bundleId];
+    NSString* bundleId = [[NSBundle mainBundle] bundleIdentifier];
+    NSString* urlString = [NSString stringWithFormat:@"https://itunes.apple.com/lookup?bundleId=%@", bundleId];
     
-    NSString* errorMsg = nil;
-    NSError *error = nil;
-    NSURLResponse *response = nil;
-    NSURL *url = [NSURL URLWithString:iTunesServiceURL];
-    NSURLRequest *request = [NSURLRequest requestWithURL:url
-                                             cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
-                                         timeoutInterval:REQUEST_TIMEOUT];
-    
-    NSData *data = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&error];
-
-    NSInteger statusCode = ((NSHTTPURLResponse *)response).statusCode;
-    if (data && statusCode == 200){
-        //in case error is garbage...
-        error = nil;
-        
-        id json = nil;
-        if ([NSJSONSerialization class]){
-            json = [[NSJSONSerialization JSONObjectWithData:data options:(NSJSONReadingOptions)0 error:&error][@"results"] lastObject];
-        }
-        else{
-            //convert to string
-            json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-        }
-        
-        if (!error){
-            //check bundle ID matches
-            NSString* responseBundleId = [self valueForKey:@"bundleId" inJSON:json];
-            if (responseBundleId){
-                self.appStoreId = [self valueForKey:@"trackId" inJSON:json];
-            }else{
-                errorMsg = @"The application could not be found on the App Store.";
+    NSURL *url = [NSURL URLWithString:urlString];
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithURL:url
+                                                             completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error || !data) {
+                if (self.launchRequestCallbackId) {
+                    [self handlePluginError:[error localizedDescription] ?: @"Network error fetching App ID" :self.launchRequestCallbackId];
+                }
+                return;
             }
-        }else{
-            errorMsg = [error localizedDescription];
-        }
-    }else if (statusCode >= 400){
-        //http error
-        errorMsg = [NSString stringWithFormat:@"The server returned a %@ error", @(statusCode)];
-    }else{
-        errorMsg = @"An unknown server error occurred";
-    }
-    
-    if(errorMsg != nil && self.launchRequestCallbackId != nil){
-        [self handlePluginError:errorMsg :self.launchRequestCallbackId];
-    }
-}
-
-- (NSString *)valueForKey:(NSString *)key inJSON:(id)json
-{
-    if ([json isKindOfClass:[NSString class]])
-    {
-        //use legacy parser
-        NSRange keyRange = [json rangeOfString:[NSString stringWithFormat:@"\"%@\"", key]];
-        if (keyRange.location != NSNotFound)
-        {
-            NSInteger start = keyRange.location + keyRange.length;
-            NSRange valueStart = [json rangeOfString:@":" options:(NSStringCompareOptions)0 range:NSMakeRange(start, [(NSString *)json length] - start)];
-            if (valueStart.location != NSNotFound)
-            {
-                start = valueStart.location + 1;
-                NSRange valueEnd = [json rangeOfString:@"," options:(NSStringCompareOptions)0 range:NSMakeRange(start, [(NSString *)json length] - start)];
-                if (valueEnd.location != NSNotFound)
-                {
-                    NSString *value = [json substringWithRange:NSMakeRange(start, valueEnd.location - start)];
-                    value = [value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-                    while ([value hasPrefix:@"\""] && ![value hasSuffix:@"\""])
-                    {
-                        if (valueEnd.location == NSNotFound)
-                        {
-                            break;
-                        }
-                        NSInteger newStart = valueEnd.location + 1;
-                        valueEnd = [json rangeOfString:@"," options:(NSStringCompareOptions)0 range:NSMakeRange(newStart, [(NSString *)json length] - newStart)];
-                        value = [json substringWithRange:NSMakeRange(start, valueEnd.location - start)];
-                        value = [value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            
+            NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            NSArray *results = json[@"results"];
+            
+            if (results.count > 0) {
+                NSDictionary *item = results[0];
+                if ([item[@"bundleId"] isEqualToString:bundleId]) {
+                    self.appStoreId = [item[@"trackId"] stringValue];
+                    if (self.launchRequestCallbackId) {
+                        [self launchAppStore:self.appStoreId];
                     }
-                    
-                    value = [value stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"\""]];
-                    value = [value stringByReplacingOccurrencesOfString:@"\\\\" withString:@"\\"];
-                    value = [value stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
-                    value = [value stringByReplacingOccurrencesOfString:@"\\\"" withString:@"\""];
-                    value = [value stringByReplacingOccurrencesOfString:@"\\n" withString:@"\n"];
-                    value = [value stringByReplacingOccurrencesOfString:@"\\r" withString:@"\r"];
-                    value = [value stringByReplacingOccurrencesOfString:@"\\t" withString:@"\t"];
-                    value = [value stringByReplacingOccurrencesOfString:@"\\f" withString:@"\f"];
-                    value = [value stringByReplacingOccurrencesOfString:@"\\b" withString:@"\f"];
-                    
-                    while (YES)
-                    {
-                        NSRange unicode = [value rangeOfString:@"\\u"];
-                        if (unicode.location == NSNotFound || unicode.location + unicode.length == 0)
-                        {
-                            break;
-                        }
-                        
-                        uint32_t c = 0;
-                        NSString *hex = [value substringWithRange:NSMakeRange(unicode.location + 2, 4)];
-                        NSScanner *scanner = [NSScanner scannerWithString:hex];
-                        [scanner scanHexInt:&c];
-                        
-                        if (c <= 0xffff)
-                        {
-                            value = [value stringByReplacingCharactersInRange:NSMakeRange(unicode.location, 6) withString:[NSString stringWithFormat:@"%C", (unichar)c]];
-                        }
-                        else
-                        {
-                            //convert character to surrogate pair
-                            uint16_t x = (uint16_t)c;
-                            uint16_t u = (c >> 16) & ((1 << 5) - 1);
-                            uint16_t w = (uint16_t)u - 1;
-                            unichar high = 0xd800 | (w << 6) | x >> 10;
-                            unichar low = (uint16_t)(0xdc00 | (x & ((1 << 10) - 1)));
-                            
-                            value = [value stringByReplacingCharactersInRange:NSMakeRange(unicode.location, 6) withString:[NSString stringWithFormat:@"%C%C", high, low]];
-                        }
-                    }
-                    return value;
+                    return;
                 }
             }
-        }
-    }
-    else
-    {
-        return json[key];
-    }
-    return nil;
+            
+            if (self.launchRequestCallbackId) {
+                [self handlePluginError:@"The application could not be found on the App Store." :self.launchRequestCallbackId];
+            }
+        });
+    }];
+    [task resume];
+}
+
+- (void)handlePluginException:(NSException*)exception :(NSString*)callbackId {
+    [self handlePluginError:exception.reason :callbackId];
+}
+
+- (void)handlePluginError:(NSString*)errorMsg :(NSString*)callbackId {
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                                      messageAsString:errorMsg];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
 }
 
 @end

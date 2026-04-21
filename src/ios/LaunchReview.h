@@ -23,23 +23,19 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-
 #ifdef CORDOVA_FRAMEWORK
 #import <Cordova/CDVPlugin.h>
 #else
 #import "Cordova/CDVPlugin.h"
 #endif
 
-/**
- * Interface which does the actual handling
- */
-@interface LaunchReview :CDVPlugin {
-}
-@property (nonatomic, retain) NSString* ratingRequestCallbackId;
-@property (nonatomic, retain) NSString* launchRequestCallbackId;
-@property (nonatomic, retain) NSString* appStoreId;
+@interface LaunchReview : CDVPlugin
 
-- (void) launch:(CDVInvokedUrlCommand*)command;
-- (void) rating:(CDVInvokedUrlCommand*)command;
+@property (nonatomic, strong, nullable) NSString *ratingRequestCallbackId;
+@property (nonatomic, strong, nullable) NSString *launchRequestCallbackId;
+@property (nonatomic, strong, nullable) NSString *appStoreId;
+
+- (void)launch:(CDVInvokedUrlCommand *)command;
+- (void)rating:(CDVInvokedUrlCommand *)command;
 
 @end

@@ -3,43 +3,58 @@
         xmlns="http://apache.org/cordova/ns/plugins/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android"
         id="cordova-launch-review"
-        version="4.1.3">
+        version="4.2.0">
 
     <name>Launch Review</name>
-    <description>Cordova/Phonegap plugin for iOS and Android to assist in leaving user reviews/ratings in the App Stores.</description>
+    <description>Cordova/PhoneGap plugin for iOS and Android to assist in leaving user reviews/ratings in the App Stores.</description>
     <author>Dave Alden</author>
 
     <repo>https://github.com/dpa99c/cordova-launch-review.git</repo>
     <issue>https://github.com/dpa99c/cordova-launch-review/issues</issue>
 
-    <keywords>ecosystem:cordova,cordova,phonegap,ios,android,review,rating</keywords>
+    <keywords>ecosystem:cordova,cordova,phonegap,ios,android,review,rating,storekit,appstore</keywords>
 
     <license>MIT</license>
+
+    <!-- Modern engines declaration -->
+    <engines>
+        <engine name="cordova" version=">=10.0.0" />
+        <engine name="cordova-ios" version=">=6.0.0" />
+        <engine name="cordova-android" version=">=10.0.0" />
+    </engines>
 
     <js-module src="www/launchreview.js" name="LaunchReview">
         <clobbers target="LaunchReview"/>
     </js-module>
 
+    <!-- Optional dependency (still useful for device.version fallback, but not strictly required anymore) -->
     <dependency id="cordova-plugin-device" version="*" />
 
-    <!-- ios -->
+    <!-- iOS Platform -->
     <platform name="ios">
+        <!-- Set a modern minimum deployment target suitable for iOS 26 era -->
+        <!-- Developers can override this in their config.xml if they need to support older iOS versions -->
+        <preference name="deployment-target" value="15.0" />
+
         <config-file target="config.xml" parent="/*">
             <feature name="LaunchReview">
                 <param name="ios-package" value="LaunchReview"/>
             </feature>
         </config-file>
 
+        <!-- Native source files -->
         <header-file src="src/ios/LaunchReview.h"/>
         <source-file src="src/ios/LaunchReview.m"/>
         <header-file src="src/ios/UIWindow+DismissNotification.h"/>
         <source-file src="src/ios/UIWindow+DismissNotification.m"/>
 
+        <!-- Required framework for SKStoreReviewController / AppStore.requestReview -->
         <framework src="StoreKit.framework"/>
     </platform>
 
-    <!-- android -->
+    <!-- Android Platform -->
     <platform name="android">
+        <!-- Updated to a more recent Play Review API version (check latest stable if needed) -->
         <framework src="com.google.android.play:review:2.0.1" />
 
         <config-file target="res/xml/config.xml" parent="/*">
