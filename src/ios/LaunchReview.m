@@ -72,7 +72,8 @@
 - (void)rating:(CDVInvokedUrlCommand*)command {
     @try {
         self.ratingRequestCallbackId = command.callbackId;
-        
+
+        // Find the active foreground scene (required for modern iOS)
         UIWindowScene *activeScene = nil;
         for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
             if (scene.activationState == UISceneActivationStateForegroundActive &&
@@ -81,31 +82,29 @@
                 break;
             }
         }
-        
-        if (@available(iOS 18.0, *)) {
+
+        // Modern path: Use requestReviewInScene (available since iOS 14)
+        if (@available(iOS 14.0, *)) {
             if (activeScene) {
-                [AppStore requestReviewInScene:activeScene];
-            } else {
-                [self handlePluginError:@"No active UIWindowScene found for review request" :command.callbackId];
-                return;
-            }
-        } else if (@available(iOS 14.0, *)) {
-            if (activeScene && [SKStoreReviewController class]) {
                 [SKStoreReviewController requestReviewInScene:activeScene];
-            } else if ([SKStoreReviewController class]) {
-                [SKStoreReviewController requestReview];
             } else {
-                [self handlePluginError:@"Rating dialog requires iOS 10.3+" :command.callbackId];
-                return;
+                // Fallback to the old no-scene API if no scene is found
+                if ([SKStoreReviewController class]) {
+                    [SKStoreReviewController requestReview];
+                }
             }
-        } else if ([SKStoreReviewController class]) {
+        }
+        // Legacy support for very old iOS (10.3 - 13.x)
+        else if ([SKStoreReviewController class]) {
             [SKStoreReviewController requestReview];
-        } else {
+        }
+        else {
             [self handlePluginError:@"Rating dialog requires iOS 10.3+" :command.callbackId];
             return;
         }
-        
-        // Always send "requested" immediately (Apple does not guarantee the prompt will appear)
+
+        // Always send "requested" immediately
+        // Apple does not guarantee the prompt will actually appear
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
                                                           messageAsString:@"requested"];
         [pluginResult setKeepCallback:@YES];
