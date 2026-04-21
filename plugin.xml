@@ -27,7 +27,7 @@
         <clobbers target="LaunchReview"/>
     </js-module>
 
-    <!-- Optional dependency (still useful for device.version fallback, but not strictly required anymore) -->
+    <!-- Required for device.version-based platform/version detection -->
     <dependency id="cordova-plugin-device" version="*" />
 
     <!-- iOS Platform -->
