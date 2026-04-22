@@ -1,28 +1,38 @@
 #import "UIWindow+DismissNotification.h"
 #import <objc/runtime.h>
 
+#pragma mark - MonitorObject
+
 @implementation MonitorObject
 
-
--(id)init:(UIWindow*)owner
+- (instancetype)initWithOwner:(UIWindow *)owner
 {
     self = [super init];
-    self.owner = owner;
-    [[NSNotificationCenter defaultCenter] postNotificationName:UIWindowDidBecomeVisibleNotification object:self];
+    if (self) {
+        self.owner = owner;
+        // Notify that the review window became visible
+        [[NSNotificationCenter defaultCenter] postNotificationName:UIWindowDidBecomeVisibleNotification
+                                                            object:self];
+    }
     return self;
-    
 }
--(void)dealloc
+
+- (void)dealloc
 {
-    [[NSNotificationCenter defaultCenter] postNotificationName:UIWindowDidBecomeHiddenNotification object:self];
+    // Notify that the review window was dismissed/hidden
+    [[NSNotificationCenter defaultCenter] postNotificationName:UIWindowDidBecomeHiddenNotification
+                                                        object:self];
 }
 
 @end
 
+#pragma mark - UIWindow (DismissNotification)
+
 @implementation UIWindow (DismissNotification)
 
-static NSString* monitorObjectKey = @"monitorKey";
-static NSString* partialDescForStoreReviewWindow =  @"SKStore";
+static const void *monitorObjectKey = &monitorObjectKey;
+static NSString * const kStoreReviewPartialDesc = @"SKStore";
+
 + (void)load
 {
     static dispatch_once_t onceToken;
@@ -35,11 +45,15 @@ static NSString* partialDescForStoreReviewWindow =  @"SKStore";
         Method originalMethod = class_getInstanceMethod(class, originalSelector);
         Method swizzledMethod = class_getInstanceMethod(class, swizzledSelector);
         
-        BOOL didAddMethod =
-        class_addMethod(class,
-                        originalSelector,
-                        method_getImplementation(swizzledMethod),
-                        method_getTypeEncoding(swizzledMethod));
+        if (!originalMethod || !swizzledMethod) {
+            NSLog(@"LaunchReview: Failed to find setWindowLevel: method for swizzling");
+            return;
+        }
+        
+        BOOL didAddMethod = class_addMethod(class,
+                                            originalSelector,
+                                            method_getImplementation(swizzledMethod),
+                                            method_getTypeEncoding(swizzledMethod));
         
         if (didAddMethod) {
             class_replaceMethod(class,
@@ -52,17 +66,20 @@ static NSString* partialDescForStoreReviewWindow =  @"SKStore";
     });
 }
 
+#pragma mark - Swizzled Method
 
-#pragma mark - Method Swizzling
-
-- (void)setWindowLevel_startMonitor:(int)level{
+- (void)setWindowLevel_startMonitor:(NSInteger)level
+{
+    // Call the original implementation first
     [self setWindowLevel_startMonitor:level];
     
-    if([self.description containsString:partialDescForStoreReviewWindow])
-    {
-        MonitorObject *monObj = [[MonitorObject alloc] init:self];
-        objc_setAssociatedObject(self, &monitorObjectKey, monObj, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        
+    // Check if this appears to be the Store Review presentation window
+    if ([self.description containsString:kStoreReviewPartialDesc]) {
+        MonitorObject *monitor = [[MonitorObject alloc] initWithOwner:self];
+        objc_setAssociatedObject(self,
+                                 monitorObjectKey,
+                                 monitor,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
