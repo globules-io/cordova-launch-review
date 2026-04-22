@@ -2,64 +2,43 @@
 <plugin
         xmlns="http://apache.org/cordova/ns/plugins/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android"
-        id="cordova-launch-review"
+        id="@globules-io/cordova-launch-review"
         version="4.2.0">
-
     <name>Launch Review</name>
     <description>Cordova/PhoneGap plugin for iOS and Android to assist in leaving user reviews/ratings in the App Stores.</description>
     <author>Dave Alden</author>
-
-    <repo>https://github.com/dpa99c/cordova-launch-review.git</repo>
-    <issue>https://github.com/dpa99c/cordova-launch-review/issues</issue>
-
+    <repo>https://github.com/globules-io/cordova-launch-review.git</repo>
+    <issue>https://github.com/globules-io/cordova-launch-review/issues</issue>
     <keywords>ecosystem:cordova,cordova,phonegap,ios,android,review,rating,storekit,appstore</keywords>
-
     <license>MIT</license>
-
-    <!-- Modern engines declaration -->
     <engines>
         <engine name="cordova" version=">=10.0.0" />
         <engine name="cordova-ios" version=">=6.0.0" />
         <engine name="cordova-android" version=">=10.0.0" />
     </engines>
-
     <js-module src="www/launchreview.js" name="LaunchReview">
         <clobbers target="LaunchReview"/>
     </js-module>
-
-    <!-- Required for device.version-based platform/version detection -->
     <dependency id="cordova-plugin-device" version="*" />
-
-    <!-- iOS Platform -->
     <platform name="ios">        
         <config-file target="config.xml" parent="/*">
             <feature name="LaunchReview">
                 <param name="ios-package" value="LaunchReview"/>
             </feature>
-        </config-file>
-
-        <!-- Native source files -->
+        </config-file> 
         <header-file src="src/ios/LaunchReview.h"/>
         <source-file src="src/ios/LaunchReview.m"/>
         <header-file src="src/ios/UIWindow+DismissNotification.h"/>
         <source-file src="src/ios/UIWindow+DismissNotification.m"/>
-
-        <!-- Required framework for SKStoreReviewController / AppStore.requestReview -->
         <framework src="StoreKit.framework"/>
     </platform>
-
-    <!-- Android Platform -->
     <platform name="android">
-        <!-- Updated to a more recent Play Review API version (check latest stable if needed) -->
         <framework src="com.google.android.play:review:2.0.1" />
-
         <config-file target="res/xml/config.xml" parent="/*">
             <feature name="LaunchReview">
                 <param name="android-package" value="uk.co.workingedge.phonegap.plugin.LaunchReview"/>
             </feature>
         </config-file>
-
         <source-file src="src/android/LaunchReview.java" target-dir="src/uk/co/workingedge/phonegap/plugin"/>
     </platform>
-
 </plugin>
